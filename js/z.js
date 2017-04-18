@@ -130,7 +130,7 @@ function createFragmentShaderScript() {
         "        if(n<=breakValue){break;}",
         "        i=n-breakValue;",
         "        scaleFactor=(u_altitude+i)/i*.15;",
-        "        y=scaleFactor*m*(fbm(u_randomValue*m+.001*u_coords+(random(vec2(i))+u_randomValue)*1000.,int(map(i,.0,u_altitude,4.,7.)),.4/scaleFactor)-.5)+(i-1.)*1.75/(u_altitude+i);",
+        "        y=scaleFactor*m*(fbm(5.*m+.001*u_coords+(random(vec2(i))+u_randomValue)*10.,int(map(i,.0,u_altitude,4.,7.)),.4/scaleFactor)-.5)+(i-1.)*1.75/(u_altitude+i);",
         "        pct=plot(st,y);",
         "        color=mix(color,vec3(map(i,.0,u_altitude,u_colorA.r,u_colorB.r),map(i,.0,u_altitude,u_colorA.g,u_colorB.g),map(i,.0,u_altitude,u_colorA.b,u_colorB.b)),pct);",
         "    }",
