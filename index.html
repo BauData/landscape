@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Landscape</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <link type="text/css" rel="stylesheet" href="css/style.css">
+    </head>
+    <body> 
+        <script id="vertexShader" type="x-shader/x-vertex">
+        void main() {
+            gl_Position = vec4(position, 1.);
+        }
+        </script>
+
+        <canvas id="c"></canvas>
+
+        <div id="loading_spinner" class="loader"></div>
+
+        <script src="js/scripts.js"></script>
+    </body>
+</html>
