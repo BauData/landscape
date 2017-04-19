@@ -75,7 +75,6 @@ function createFragmentShaderScript() {
         "uniform float   u_altitude;",
         "uniform vec3    u_colorA;",
         "uniform vec3    u_colorB;",
-        "uniform float   u_randomValue;",
         "float lerp(float value,float min,float max){",
         "    return min+(max-min)*value;",
         "}",
@@ -104,7 +103,7 @@ function createFragmentShaderScript() {
         "    float v=.0;",
         "    float lacunarity=2.;",
         "    float a=.5;",
-        "    n=n*l;",
+        "    n*=l;",
         "    for(int i=0;i<MAX_OCTAVES;++i){",
         "        if(i>=octaves){break;}",
         "        v+=a*noise(n);",
@@ -120,7 +119,7 @@ function createFragmentShaderScript() {
         "    vec2 st=gl_FragCoord.xy/u_resolution.xy;",
         "    st.x *=u_resolution.x/u_resolution.y;",
         "    float m=st.x*.5+.5;",
-        "    vec3 color=u_colorB+vec3(0.2,0.2,0.2);",
+        "    vec3 color=u_colorB+vec3(.2,.2,.2);",
         "    float y;",
         "    float pct;",
         "    float scaleFactor;",
@@ -130,7 +129,7 @@ function createFragmentShaderScript() {
         "        if(n<=breakValue){break;}",
         "        i=n-breakValue;",
         "        scaleFactor=(u_altitude+i)/i*.15;",
-        "        y=scaleFactor*m*(fbm(5.*m+.001*u_coords+(random(vec2(i))+u_randomValue)*10.,int(map(i,.0,u_altitude,4.,7.)),.4/scaleFactor)-.5)+(i-1.)*1.75/(u_altitude+i);",
+        "        y=scaleFactor*m*(fbm(5.*(m+pow(i,random(vec2(i))))+.001*u_coords+random(vec2(i)*500.),int(map(i,.0,u_altitude,4.,7.)),.4/scaleFactor)-.5)+(i-1.)*1.75/(u_altitude+i);",
         "        pct=plot(st,y);",
         "        color=mix(color,vec3(map(i,.0,u_altitude,u_colorA.r,u_colorB.r),map(i,.0,u_altitude,u_colorA.g,u_colorB.g),map(i,.0,u_altitude,u_colorA.b,u_colorB.b)),pct);",
         "    }",
@@ -158,6 +157,7 @@ function initWeather() {
         }, function(err, locations) {
             if(!err) {
                 altitude = atutil.map(locations[0].elevation, 0, 1750, 3, 10);
+                altitude = Math.floor(altitude);
             }
             if(!altitude) {
                 altitude = 5;
@@ -201,8 +201,7 @@ function setup() {
         u_colorA: {type: "c", value: ColorA},
         u_colorB: {type: "c", value: ColorB},
         u_coords: {type: "v2", value: new THREE.Vector2()},
-        u_altitude: {type: "f", value: Math.floor(altitude)},
-        u_randomValue: { type: "f", value: atutil.randomInt(3,7) },
+        u_altitude: {type: "f", value: altitude},
         u_resolution: { type: "v2", value: new THREE.Vector2() }
     };
     uniforms.u_resolution.value.x = width;
