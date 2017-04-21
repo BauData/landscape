@@ -23,7 +23,7 @@ var lat;
 var lon;
 var altitude;
 //video
-var frameLimit;
+var frameLimit = 1;
 var currentFrame = 0;
 
 preload();
@@ -31,14 +31,13 @@ preload();
 function preload() {
 	if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
     socketInit();
-    createFragmentShaderScript();
     initWeather();
 }
 // assetLoaded
 function assetLoaded() {
     ++loadedAssets;
     //attenzione perché se il valore max non è giusto, si chiama + volte la funzione start
-    if (loadedAssets == 4) {
+    if (loadedAssets == 3) {
         allLoaded();
     }
 }
@@ -61,8 +60,56 @@ function start() {
     setup();
     animate();
 }
+//initWeather
+function initWeather() {
+    var weather = require ('openweathermap');
+    var Client = require('node-rest-client').Client;
+    var elevationApi = require('google-elevation-api');
+    var config = require('./../config');
+    var client = new Client();
+    client.get(locationFull + "/getRandomCity", function (data, response) {
+        lon = data.cityLon;
+        lat = data.cityLat;
+        elevationApi({
+            key: config.googlemaps.KEY,
+            locations: [[lat, lon]]
+        }, function(err, locations) {
+            if(!err) {
+                altitude = atutil.map(locations[0].elevation, 0, 1750, 3, 10);
+                altitude = Math.floor(altitude);
+            }
+            if(!altitude) {
+                altitude = 5;
+            }
+            weather.defaults({units: 'metric', lang: 'en', mode: 'json'});
+            weather.now({id: data.cityID, APPID: config.openweathermap.APPID}, report);
+            function report(err, json) {
+                if (!err) {
+                    var weatherCode = json.weather[0].id;
+                    var weatherTemp = json.main.temp;
+                    var colors = weatherMapping.mapWeatherCode(weatherCode, weatherTemp);
+                    if(colors.colorA && colors.colorB) { 
+                        ColorA = new THREE.Color(colors.colorA);
+                        ColorB = new THREE.Color(colors.colorB);
+                        socket.emit('weather', {    
+                            description: json.weather[0].description,
+                            temperature: weatherTemp,
+                        });
+                        createFragmentShaderScript(); 
+                        assetLoaded();  
+                    }
+                }
+            }
+        });
+
+    });
+}
 //createFragmentShaderScript
 function createFragmentShaderScript() {
+    var colorOne = "vec3(" + ColorA.r + "," + ColorA.g + "," + ColorA.b + ")";
+    var colorTwo = "vec3(" + ColorB.r + "," + ColorB.g + "," + ColorB.b + ")";
+    var coords =  "vec2(" + Math.abs(lat) + "," + Math.abs(lon) + ")";
+    var elevetion =  altitude.toFixed(1);
     var script = document.createElement('script');
     script.type = 'x-shader/x-fragment';
     script.id = 'fragmentShader';
@@ -70,25 +117,12 @@ function createFragmentShaderScript() {
         "#define NUM_MOUNTAINS 15.",
         "#define MAX_OCTAVES 8",
         "uniform vec2    u_resolution;",
-        "uniform float   u_time;",
-        "uniform vec2    u_coords;",
-        "uniform float   u_altitude;",
-        "uniform vec3    u_colorA;",
-        "uniform vec3    u_colorB;",
-        "float lerp(float value,float min,float max){",
-        "    return min+(max-min)*value;",
-        "}",
-        "float norm(float value,float min,float max){",
-        "    return (value-min)/(max-min);",
-        "}",
         "float map(float value,float min1,float max1,float min2,float max2){",
-        "    return lerp(norm(value,min1,max1),min2,max2);",
+        "    return min2+(value-min1)*(max2-min2)/(max1-min1);",
         "}",
         "float random(in vec2 st){",
         "    return fract(sin(dot(st.xy,vec2(12.9898,78.233)))*43758.5453123);",
         "}",
-        "// Based on Morgan McGuire @morgan3d",
-        "// https://www.shadertoy.com/view/4dS3Wd",
         "float noise(in vec2 st){",
         "    vec2 i=floor(st);",
         "    vec2 f=fract(st);",
@@ -117,21 +151,24 @@ function createFragmentShaderScript() {
         "}",
         "void main(){",
         "    vec2 st=gl_FragCoord.xy/u_resolution.xy;",
-        "    st.x *=u_resolution.x/u_resolution.y;",
+        "    st.x*=u_resolution.x/u_resolution.y;",
         "    float m=st.x*.5+.5;",
-        "    vec3 color=u_colorB+vec3(.2,.2,.2);",
+        "    vec3 colorA=" + colorOne + ";",
+        "    vec3 colorB=" + colorTwo + ";",
+        "    vec3 color=colorB+vec3(.2,.2,.2);",
         "    float y;",
         "    float pct;",
         "    float scaleFactor;",
-        "    float breakValue=NUM_MOUNTAINS-u_altitude;",
+        "    vec2 coords="+coords+";",
+        "    float breakValue=NUM_MOUNTAINS-" + elevetion + ";",
         "    float i;",
         "    for(float n=NUM_MOUNTAINS;n>0.;n--){",
         "        if(n<=breakValue){break;}",
         "        i=n-breakValue;",
-        "        scaleFactor=(u_altitude+i)/i*.15;",
-        "        y=scaleFactor*m*(fbm(5.*(m+pow(i,random(vec2(i))))+.001*u_coords+random(vec2(i)*500.),int(map(i,.0,u_altitude,4.,7.)),.4/scaleFactor)-.5)+(i-1.)*1.75/(u_altitude+i);",
+        "        scaleFactor=(" + elevetion + "+i)/i*.15;",
+        "        y=scaleFactor*m*(fbm(5.*(m+pow(coords.x,random(coords)))+.001*coords,int(map(i,.0," + elevetion + ",4.,7.)),.4/scaleFactor)-.5)+(i-1.)*1.75/(" + elevetion + "+i);",
         "        pct=plot(st,y);",
-        "        color=mix(color,vec3(map(i,.0,u_altitude,u_colorA.r,u_colorB.r),map(i,.0,u_altitude,u_colorA.g,u_colorB.g),map(i,.0,u_altitude,u_colorA.b,u_colorB.b)),pct);",
+        "        color=mix(color,vec3(map(i,.0," + elevetion + ",colorA.r,colorB.r),map(i,.0," + elevetion + ",colorA.g,colorB.g),map(i,.0," + elevetion + ",colorA.b,colorB.b)),pct);",
         "    }",
         "    gl_FragColor=vec4(color,1.);",
         "}",
@@ -139,54 +176,6 @@ function createFragmentShaderScript() {
     document.body.appendChild(script);
     socket.emit('shader', script.text);
     assetLoaded(); 
-}
-//initWeather
-function initWeather() {
-    var weather = require ('openweathermap');
-    var Client = require('node-rest-client').Client;
-    var elevationApi = require('google-elevation-api');
-    var config = require('./../config');
-    var client = new Client();
-    console.log(locationFull);
-    client.get(locationFull + "/getRandomCity", function (data, response) {
-        lon = data.cityLon;
-        lat = data.cityLat;
-        elevationApi({
-            key: config.googlemaps.KEY,
-            locations: [[lat, lon]]
-        }, function(err, locations) {
-            if(!err) {
-                altitude = atutil.map(locations[0].elevation, 0, 1750, 3, 10);
-                altitude = Math.floor(altitude);
-            }
-            if(!altitude) {
-                altitude = 5;
-            }
-            assetLoaded();
-        });
-        weather.defaults({units: 'metric', lang: 'en', mode: 'json'});
-        weather.now({id: data.cityID, APPID: config.openweathermap.APPID}, report);
-        function report(err, json) {
-            if (!err) {
-                var weatherCode = json.weather[0].id;
-                var weatherTemp = json.main.temp;
-                var colors = weatherMapping.mapWeatherCode(weatherCode, weatherTemp);
-                if(colors.colorA && colors.colorB) { 
-                    ColorA = new THREE.Color(colors.colorA);
-                    ColorB = new THREE.Color(colors.colorB);
-                    socket.emit('weather', {    
-                        description: json.weather[0].description,
-                        temperature: weatherTemp,
-                        colors: {
-                            colorA: ColorA.r + "," + ColorA.g + "," + ColorA.b,
-                            colorB: ColorB.r + "," + ColorB.g + "," + ColorB.b
-                        }
-                    }); 
-                    assetLoaded();  
-                }
-            }
-        }
-    });
 }
 // setup
 function setup() {
@@ -198,16 +187,10 @@ function setup() {
     var geometry = new THREE.PlaneBufferGeometry(2, 2);
 
     var uniforms = {
-        u_colorA: {type: "c", value: ColorA},
-        u_colorB: {type: "c", value: ColorB},
-        u_coords: {type: "v2", value: new THREE.Vector2()},
-        u_altitude: {type: "f", value: altitude},
         u_resolution: { type: "v2", value: new THREE.Vector2() }
     };
     uniforms.u_resolution.value.x = width;
     uniforms.u_resolution.value.y = height;
-    uniforms.u_coords.value.x = lat;
-    uniforms.u_coords.value.y = lon;
     var material = new THREE.ShaderMaterial( {
         uniforms: uniforms,
         vertexShader: document.getElementById( 'vertexShader' ).textContent,
@@ -220,7 +203,7 @@ function setup() {
 	renderer.setPixelRatio( window.devicePixelRatio );
 	renderer.setSize( width , height );
 
-    setTimeout( function(){ currentFrame = 1 }, 100);
+    setTimeout( function(){ currentFrame = 1 }, 3000);
 
     onWindowResize();
     window.addEventListener( 'resize', onWindowResize, false );
@@ -253,10 +236,19 @@ function render() {
 }
 
 function renderFrame() {
-    if( currentFrame >= 1 && currentFrame <= frameLimit ) {
-        sendFrame();
+    if(currentFrame >= 1 && currentFrame < frameLimit + 1) {
+        if(currentFrame == 1){
+            sendCover(); 
+        }
+        if(frameLimit != 1){
+            sendFrame(); 
+        }
         currentFrame++;
     }
+}
+
+function sendCover() {
+    socket.emit('coverFrame',document.querySelector('canvas').toDataURL('image/jpeg', 1.0));
 }
 
 function sendFrame() {
@@ -265,19 +257,13 @@ function sendFrame() {
         frame: currentFrameString,
         file: document.querySelector('canvas').toDataURL()
     });
-    if (currentFrameString == '001') {
-        socket.emit('coverFrame',document.querySelector('canvas').toDataURL('image/jpeg', 1.0));
-    }
 }
 
 function socketInit() {
     socket = io.connect(locationFull);
-    socket.on("frameLimit", setFrameLimit);
+    socket.emit("frameLimit", frameLimit);
     socket.emit('bot', 'landscape');
     assetLoaded();
 }
 
-function setFrameLimit(data) {
-    frameLimit = data;
-}
 console.log("client is running");
