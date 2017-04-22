@@ -25,7 +25,7 @@ print "\n\n*** Welcome to the automatic client script ***\n"
 
 driver = webdriver.Firefox(executable_path=r'/usr/local/bin/geckodriver')
 #driver.get("http://baudata.ddns.net:3000/gradient")
-driver.get("http://192.168.1.45:3000/landscape")
+driver.get("http://192.168.1.45:4000/landscape")
 
 class Namespace(BaseNamespace):
 
@@ -39,7 +39,7 @@ class Namespace(BaseNamespace):
         print('[Disconnected]')
 
 
-with SocketIO('http://192.168.1.45', 3000, Namespace) as socketIO:
+with SocketIO('http://192.168.1.45', 4000, Namespace) as socketIO:
     socketIO.on('closeMsg', on_reponse)
     socketIO.wait()
 

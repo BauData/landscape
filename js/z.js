@@ -1,7 +1,7 @@
 var THREE = require('three');
 var TWEEN = require('tween.js');
 var io = require('socket.io-client');
-var atutil = require('atutil');
+var ATUtil = require('atutil');
 
 var socket;
 var locationFull = location.protocol+'//'+location.hostname+(location.port ? ':'+location.port: '');
@@ -63,6 +63,7 @@ function start() {
 //initWeather
 function initWeather() {
     var weather = require ('openweathermap');
+    var weatherMapping = require ('weatherMapping');
     var Client = require('node-rest-client').Client;
     var elevationApi = require('google-elevation-api');
     var config = require('./../config');
@@ -75,7 +76,7 @@ function initWeather() {
             locations: [[lat, lon]]
         }, function(err, locations) {
             if(!err) {
-                altitude = atutil.map(locations[0].elevation, 0, 1750, 3, 10);
+                altitude = ATUtil.map(locations[0].elevation, 0, 1750, 3, 10);
                 altitude = Math.floor(altitude);
             }
             if(!altitude) {
@@ -106,15 +107,15 @@ function initWeather() {
 }
 //createFragmentShaderScript
 function createFragmentShaderScript() {
-    var colorOne = "vec3(" + ColorA.r + "," + ColorA.g + "," + ColorA.b + ")";
-    var colorTwo = "vec3(" + ColorB.r + "," + ColorB.g + "," + ColorB.b + ")";
+    var colorOne = "vec3(" + ColorA.r.toFixed(2) + "," + ColorA.g.toFixed(2) + "," + ColorA.b.toFixed(2) + ")";
+    var colorTwo = "vec3(" + ColorB.r.toFixed(2) + "," + ColorB.g.toFixed(2) + "," + ColorB.b.toFixed(2) + ")";
+    var skyColor = generateSkyColor();
     var coords =  "vec2(" + Math.abs(lat) + "," + Math.abs(lon) + ")";
     var elevetion =  altitude.toFixed(1);
     var script = document.createElement('script');
     script.type = 'x-shader/x-fragment';
     script.id = 'fragmentShader';
     script.text = [
-        "#define NUM_MOUNTAINS 15.",
         "#define MAX_OCTAVES 8",
         "uniform vec2    u_resolution;",
         "float map(float value,float min1,float max1,float min2,float max2){",
@@ -155,18 +156,15 @@ function createFragmentShaderScript() {
         "    float m=st.x*.5+.5;",
         "    vec3 colorA=" + colorOne + ";",
         "    vec3 colorB=" + colorTwo + ";",
-        "    vec3 color=colorB+vec3(.2,.2,.2);",
+        "    vec3 color=" + skyColor + ";",
         "    float y;",
         "    float pct;",
-        "    float scaleFactor;",
+        "    float scaleFact;",
         "    vec2 coords="+coords+";",
-        "    float breakValue=NUM_MOUNTAINS-" + elevetion + ";",
         "    float i;",
-        "    for(float n=NUM_MOUNTAINS;n>0.;n--){",
-        "        if(n<=breakValue){break;}",
-        "        i=n-breakValue;",
-        "        scaleFactor=(" + elevetion + "+i)/i*.15;",
-        "        y=scaleFactor*m*(fbm(5.*(m+pow(coords.x,random(coords)))+.001*coords,int(map(i,.0," + elevetion + ",4.,7.)),.4/scaleFactor)-.5)+(i-1.)*1.75/(" + elevetion + "+i);",
+        "    for(float i=" + elevetion + ";i>0.;i--){",
+        "        scaleFact=(" + elevetion + "+i)/i*.15;",
+        "        y=scaleFact*m*(fbm(5.*(m+pow(coords.x,random(coords)))+.001*coords,int(map(i,.0," + elevetion + ",5.,7.)),.4/scaleFact)-.5)+(i-1.)*3./(" + elevetion + "+i);",
         "        pct=plot(st,y);",
         "        color=mix(color,vec3(map(i,.0," + elevetion + ",colorA.r,colorB.r),map(i,.0," + elevetion + ",colorA.g,colorB.g),map(i,.0," + elevetion + ",colorA.b,colorB.b)),pct);",
         "    }",
@@ -176,6 +174,27 @@ function createFragmentShaderScript() {
     document.body.appendChild(script);
     socket.emit('shader', script.text);
     assetLoaded(); 
+}
+//generateSkyColor
+function generateSkyColor() {
+    var res;
+    var factor = ATUtil.randomRange(.0, .2);
+    //lighter
+    if (factor >= .0 && factor < .1) {
+        res = ColorB;
+        res.r = ATUtil.clamp((ColorB.r + .2), .0, 1.);
+        res.g = ATUtil.clamp((ColorB.g + .2), .0, 1.);
+        res.b = ATUtil.clamp((ColorB.b + .2), .0, 1.);
+    }
+    //another color
+    else {
+        res = ATUtil.randomInt(0, 360);
+        var lightness = ATUtil.randomInt(40, 100);
+        res = "hsl(" + res + ", 100%, " + lightness + "%)";
+        res = new THREE.Color(res);
+    }
+    res = "vec3(" + res.r.toFixed(2) + "," + res.g.toFixed(2) + "," + res.b.toFixed(2) + ")";
+    return res;
 }
 // setup
 function setup() {
@@ -212,15 +231,15 @@ function setup() {
 function onWindowResize( event ) {
     width = window.innerWidth;   
     height = window.innerHeight;
-    halfWidth = window.innerWidth / 2;
-	halfHeight = window.innerHeight / 2;
+    halfWidth = width / 2;
+	halfHeight = height / 2;
 	camera.left = -halfWidth;
 	camera.right = halfWidth;
 	camera.top = halfHeight;
 	camera.bottom = -halfHeight;
     camera.updateProjectionMatrix();
-    mesh.material.uniforms.u_resolution.value.x = renderer.domElement.width;
-    mesh.material.uniforms.u_resolution.value.y = renderer.domElement.height;
+    mesh.material.uniforms.u_resolution.value.x = width;
+    mesh.material.uniforms.u_resolution.value.y = height;
     renderer.setSize( width, height );
 }
 
@@ -252,7 +271,7 @@ function sendCover() {
 }
 
 function sendFrame() {
-    var currentFrameString = atutil.pad(currentFrame.toString(), 3);
+    var currentFrameString = ATUtil.pad(currentFrame.toString(), 3);
     socket.emit('renderFrame', {    
         frame: currentFrameString,
         file: document.querySelector('canvas').toDataURL()
