@@ -163,7 +163,7 @@ function createFragmentShaderScript() {
         "    vec2 coords="+coords+";",
         "    float i;",
         "    for(float i=" + elevetion + ";i>0.;i--){",
-        "        scaleFact=(" + elevetion + "+i)/i*.15;",
+        "        scaleFact=(" + elevetion + "+i)/i*.25;",
         "        y=scaleFact*m*(fbm(5.*(m+pow(coords.x,random(coords)))+.001*coords,int(map(i,.0," + elevetion + ",5.,7.)),.4/scaleFact)-.5)+(i-1.)*3./(" + elevetion + "+i);",
         "        pct=plot(st,y);",
         "        color=mix(color,vec3(map(i,.0," + elevetion + ",colorA.r,colorB.r),map(i,.0," + elevetion + ",colorA.g,colorB.g),map(i,.0," + elevetion + ",colorA.b,colorB.b)),pct);",
@@ -251,7 +251,7 @@ function animate() {
 
 function render() {
     renderer.render( scene, camera );
-    renderFrame();
+    //renderFrame();
 }
 
 function renderFrame() {
