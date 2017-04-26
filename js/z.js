@@ -251,7 +251,7 @@ function animate() {
 
 function render() {
     renderer.render( scene, camera );
-    //renderFrame();
+    renderFrame();
 }
 
 function renderFrame() {
