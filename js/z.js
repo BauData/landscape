@@ -1,5 +1,5 @@
 var THREE = require('three');
-var TWEEN = require('tween.js');
+var TWEEN = require('@tweenjs/tween.js');
 var io = require('socket.io-client');
 var ATUtil = require('atutil');
 
